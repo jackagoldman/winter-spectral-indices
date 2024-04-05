@@ -21,12 +21,11 @@ readFire <- function(firePath){
 renameBands <- function(coll){
   bands <- list("SR_B5", "SR_B7", "QA_PIXEL")
   renameList <- list("B4", "B7", "pixel_qa")
-  imgColl <- coll$select(bands,renameList)
+  imgColl <- coll$select(list("SR_B5", "SR_B7", "QA_PIXEL") ,list("B4", "B7", "pixel_qa"))
   
   return(imgColl) 
 }
 
-print(imgColl$filterDate(preFireYear, fireYear)$getInfo())
 # filter image collection by month
 filter_col_winter <- function(ls_img){
   ls_date <- ls_img$
@@ -60,7 +59,7 @@ timeFrame <- function(data){
   fireYear <- fireYear |> as.character() |> as.data.frame()
   postFire <- (year + 1)
   postFire <- lubridate::ymd(postFire, truncated = 2L) 
-  month(postFire) <- 2
+  month(postFire) <- 3
   postFire <- postFire |> as.character() |> as.data.frame()
   yearEnd <- year
   yearEnd<- lubridate::ymd(yearEnd, truncated = 2L) 
@@ -75,139 +74,35 @@ timeFrame <- function(data){
   return(res)
 }
 
-# ls col
 
-createNBRcoll <- function(ls4, ls5, ls7, ls8){
+# get landsat 8 nbr
+ls8Nbr <- function(img){
   
-  #ls8 <- renameBands(ls8) (NOT WORKING, siwth normalized to SR)
-  
-  # make image collection for ls_8
-  
-  ls8Nbr <- ee$ImageCollection(ls8$map(function(image){
-    
-    nbr <- image$normalizedDifference(c("SR_B5", "SR_B7"))$float()$rename("nbr")
-    qa <- image$select("QA_PIXEL")
-    img <- nbr$addBands(qa)
-    
-    quality <- img$select('QA_PIXEL')
-    clear <- quality$bitwiseAnd(4)$eq(0)$ #cloud shadow
-      And(quality$bitwiseAnd(3)$eq(0))$ # cloud
-      And(quality$bitwiseAnd(7)$eq(0))$ # water
-      And(quality$bitwiseAnd(5)$eq(0)) #snow
-    img <- img$updateMask(clear)$select(0)
-    
-    
-    return(img)
-    
-  }))
-  
- 
+  quality <- img$select('QA_PIXEL')
+  clear <- quality$bitwiseAnd(4)$ #cloud shadow
+    And(quality$bitwiseAnd(3))$ # cloud
+    And(quality$bitwiseAnd(7))$ # water
+    And(quality$bitwiseAnd(5))#snow
+  img <- img$updateMask(clear$Not())
+  img$normalizedDifference(list("SR_B5", "SR_B7"))$float()$rename("nbr")
   
   
   
-  ls_col47 <- ee$ImageCollection(ls7$merge(ls5)$merge(ls4))
-
-  
-  
-  # make image collection
-  ls47NBR <- ee$ImageCollection(ls_col47$map(function(img){
-    
-    nbr <- img$normalizedDifference(c("B4", "B7"))$float()$rename("nbr")
-    qa <- img$select("pixel_qa")
-    img <- nbr$addBands(qa)
-    
-    quality <- img$select('pixel_qa')
-    clear <- quality$bitwiseAnd(8)$eq(0)$ #cloud shadow
-      And(quality$bitwiseAnd(32)$eq(0))$ # cloud
-      And(quality$bitwiseAnd(4)$eq(0))$ # water
-      And(quality$bitwiseAnd(16)$eq(0)) #snow
-    img <- img$updateMask(clear)$select(0)
-    
-    
-    return(img)
-    
-  }))
-  
-  colNBR <-ee$ImageCollection(ls8Nbr$merge(ls47NBR))
-  
-  return(colNBR)
-}
-
-
-# Create landsat 8 image collection for NBR
-ls8_indices <- function(ls_img){
-  require(rgee)
-  nbr <- ls_img$normalizedDifference(c("SR_B5", "SR_B7"))$float()$rename("nbr")
-  qa <- ls_img$select("QA_PIXEL")$
-    rename("pixel_qa")
-  
-  nbr$addBands(qa)$
-    copyProperties(ls_img, list("system:time_start"))
-
-  
-  return(nbr)
   
 }
 
-# Create landsat 4-7 image collection for NBR
-ls4_7_indices <- function(ls_img){
-  require(rgee)
-  nbr <- ls_img$normalizedDifference(c('B4', 'B7'))$float()$rename("nbr")
-  qa <- ls_img$select("pixel_qa")
-  nbr$addBands(qa)$
-    copyProperties(ls_img, list("system:time_start"))
+# make image collection
+ls47NBR <- function(img){
   
-  return(nbr)
+  quality <- img$select('QA_PIXEL')
+  clear <- quality$bitwiseAnd(4)$ #cloud shadow
+    And(quality$bitwiseAnd(3))$ # cloud
+    And(quality$bitwiseAnd(7))$ # water
+    And(quality$bitwiseAnd(5))#snow
+  img <- img$updateMask(clear$Not())
+  img$normalizedDifference(list("SR_B4", "SR_B7"))$float()$rename("nbr")
   
-}
 
-
-
-# create mask for clear pixels
-lscf_mask47 <- function(ls_img){
-  require(rgee)
-  quality <- ls_img$select('pixel_qa')
-  clear <- quality$bitwiseAnd(8)$eq(0)$ #cloud shadow
-    And(quality$bitwiseAnd(32)$eq(0))$ # cloud
-    And(quality$bitwiseAnd(4)$eq(0))$ # water
-    And(quality$bitwiseAnd(16)$eq(0)) #snow
-  ls_img <- ls_img$updateMask(clear)$select(0)$
-    copyProperties(ls_img, list("system:time_start"))
-  return(ls_img)
-}
-
-#create mask for clear pixels
-lscf_mask8 <- function(ls_img){
-  require(rgee)
-  quality <- ls_img$select('pixel_qa')
-  clear <- quality$bitwiseAnd(4)$eq(0)$ #cloud shadow
-    And(quality$bitwiseAnd(3)$eq(0))$ # cloud
-    And(quality$bitwiseAnd(7)$eq(0))$ # water
-    And(quality$bitwiseAnd(5)$eq(0)) #snow
-  ls_img <- ls_img$updateMask(clear)$select(0)$
-    copyProperties(ls_img, list("system:time_start"))
-  return(ls_img)
-}
-
-# function to map  around indices to get images as NBR and apply mask
-filter_ls <- function(ls_img, lsVersion){
-  require(rgee)
-  if(lsVersion == 8){
-    ls <- ls_img$map(ls8_indices)
-    ls <- ls$map(lscf_mask8)
-  }else{
-    ls <- ls_img$map(ls4_7_indices)
-    ls <- ls$map(lscf_mask47)
-  }
- return(ls)
-}
-
-
-# Merge Landsat Collections
-merge_imageColl <- function(ls8, ls7, ls5, ls4){
-  require(rgee)
-  ls_col <- ee$ImageCollection(ls8$merge(ls7)$merge(ls5)$merge(ls4))
-  return(ls_col)
 }
 
 
@@ -228,15 +123,4 @@ exportTable <-  function(metrics, GG_DIR){
 }
 
 
-#get metrics
-getMetrics <- function(fires, ls_col, GG_DIR){
-  
-  indicies <- indices_f(fires, ls_col)
-  
-  metrics <-  fires$map(nbr_sev_indices)
-  
-  fire.sev.stats <- exportTable(metrics, GG_DIR)
-  
-  return(fire.sev.stats)
-  
-}
+
