@@ -69,9 +69,12 @@ ls4 = ls4SR.map(ls4_7_Indices).map(lsCfmask);
 # Merge Landsat Collections
 lsCol = ee.ImageCollection(ls8.merge(ls7).merge(ls5).merge(ls4));
 
-fire = ee.Feature(fires.first())
 
-indices = ee.ImageCollection(fires.map(indices_function))
+# loop
+
+
+
+
 
 
 
