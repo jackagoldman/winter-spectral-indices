@@ -1,0 +1,27 @@
+Certain fires in the study are missing imagery between the dates of Dec 1 - April 1
+
+
+If the code says pre "name" - the fire has a zero count for preNBR band
+
+if the code says post "name" - the fire has a zero count for postNBR band
+
+if the code says pre_nk "name" - the fire does not a preNBR dictionary key, meaning that band is missing
+
+if the code says post_nk "name" - the fire does not a postNBR dictionary key, meaning that band is missing
+
+
+
+
+pre QC_65_1990
+post COC23_1995_1273
+post COC38_1995_629
+pre_nk QC_480_1996
+post QC_728_1996
+post_nk QC_739_1996
+post_nk QC_745_1996
+pre_nk QC_750_1996
+post_nk QC_757_1996
+post_nk QC_783_1996
+post QC_788_1996
+post QC_792_1996
+pre_nk COC16_1997_1038
