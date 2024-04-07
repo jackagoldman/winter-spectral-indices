@@ -2,19 +2,22 @@ def check_image_info(img):
   imgInf = img.getInfo()
   print(imgInf)
   
-  
   # Returns vegetation indices for LS8 / change to CO2_T2_L2
 def ls8_Indices(lsImage):
   nbr = lsImage.normalizedDifference(['SR_B5', 'SR_B7']).toFloat()
   qa = lsImage.select(['QA_PIXEL'])
-  return nbr.addBands([qa]).select([0,1], ['nbr', 'QA_PIXEL']).copyProperties(lsImage, ['system:time_start'])
+  ndsi = image.normalizedDifference({'SR_B3', 'SR_B6'}).toFloat()
+  nbr = nbr.addBands(ndsi)
+  return nbr.addBands([qa]).select([0,1,2], ['nbr', 'ndsi','QA_PIXEL']).copyProperties(lsImage, ['system:time_start'])
 
   
 #// Returns vegetation indices for LS4, LS5 and LS7 . change to CO2_T2_L2
  def ls4_7_Indices(lsImage):
    nbr = lsImage.normalizedDifference(['SR_B4', 'SR_B7']).toFloat()
+   ndsi = image.normalizedDifference({'SR_B2', 'SR_B5'}).toFloat()
+   nbr = nbr.addBands(ndsi)
    qa = lsImage.select(['QA_PIXEL'])
-   return nbr.addBands([qa]).select([0,1], ['nbr', 'QA_PIXEL']).copyProperties(lsImage, ['system:time_start'])
+   return nbr.addBands([qa]).select([0,1,2], ['nbr','ndsi', 'QA_PIXEL']).copyProperties(lsImage, ['system:time_start'])
   
  
 # Mask Landsat surface reflectance images
@@ -31,11 +34,38 @@ def ls8_Indices(lsImage):
       .copyProperties(lsImg, ["system:time_start"])
    
    
-   
-   def check_pixel_count(img, geom):
+#  check to see if there are pixels: this prints to console
+def check_pixel_count(img, geom):
   res = img.reduceRegion(**{
   'reducer': ee.Reducer.count(),\
   'geometry':geom,\
   'scale': 30})
-  return(res)
-   
+  print(res.getInfo())
+
+
+# check to see if there are pixels: this returns a number object
+def return_pixel_count(img, geom, time):
+  res = img.reduceRegion(**{
+  'reducer': ee.Reducer.count(),\
+  'geometry':geom,\
+  'scale': 30})
+  if time == "preNBR":
+    res = res.getNumber('preNBR')
+  elif time == "postNBR":
+    res = res.getNumber('postNBR')
+  return(res.getInfo())
+
+# check dates - converts ee date to y-m-d and prints in console
+def check_dates(date):
+  date = date.format('Y-M-d')
+  print(date.getInfo())
+
+
+# check if image contains key
+def get_keys(img, geom):
+  res = img.reduceRegion(**{
+  'reducer': ee.Reducer.count(),\
+  'geometry':geom,\
+  'scale': 30})
+  res = res.keys()
+  return(res.getInfo())

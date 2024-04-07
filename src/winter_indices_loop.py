@@ -47,25 +47,23 @@ lsCol = ee.ImageCollection(ls8.merge(ls7).merge(ls5))
   for j in fids:
   name = j
   
-  b = fires.filter(ee.Filter.eq('Fire_ID', name))
-  fB = b.geometry().bounds()
   
-  fiya = ee.Image(foi.filterMetadata('fireID', 'equals', name).first());
+  fiya = fires.filterMetadata('Fire_ID', 'equals', name).first();
+  ft = ee.Feature(fiya)
   #get image
   
   
-  fName = ft1.get("Fire_ID")
-  fire = ft1
-  fireBounds = ft1.geometry().bounds()
-  year = ft1.get('Fire_Year')
+  fName = ft.get("Fire_ID")
+  fire = ft
+  fireBounds = ft.geometry().bounds()
+  year = ft.get('Fire_Year')
   year = ee.String(year)
   fireYear = ee.Date(year)
   preFireYear = fireYear.advance(-1, 'year')
   postFireYear = fireYear.advance(1, 'year')
   preFireYearAd = preFireYear.advance(11, 'month')
   fireYearAd = fireYear.advance(3, 'month')
-  postFireYearAd = postFireYear.advance(2, 'month')
-  postFireYearAd = postFireYearAd.advance(31, 'day')
+  postFireYearAd = postFireYear.advance(3, 'month')
   fireYearAd2 = fireYear.advance(11, 'month')
 
   preFireIndices = lsCol \
@@ -81,19 +79,22 @@ lsCol = ee.ImageCollection(ls8.merge(ls7).merge(ls5))
           .select('nbr') \
           .max() \
           .rename('postNBR')
-          
+  
+
+  # if pixel is 0, go to the next
+  if return_pixel_count(preFireIndices, fireBounds, "preNBR") == 0:
+    continue
+  
+  if return_pixel_count(postFireIndices, fireBounds, "postNBR") == 0:
+    continue
+    
   fireIndices = preFireIndices.addBands(postFireIndices)
   
-  dnbr = fireIndices.expression( "(b('preNBR') - b('postNBR')) * 1000") \
-              .rename('dnbr').toFloat()
+  dnbr = fireIndices.expression( "(b('preNBR') - b('postNBR')) * 1000").rename('dnbr').toFloat()
   
-  ring  = fire.buffer(180).difference(fire);
+  ring  = ft.buffer(180).difference(ft);
   
-  offset = ee.Image.constant(ee.Number(dnbr.select('dnbr').reduceRegion(**{ 
-      'reducer': ee.Reducer.mean(),
-      'geometry': ring.geometry(),
-      'scale': 30,
-      'maxPixels': 1e9}).get('dnbr')))
+  offset = ee.Image.constant(ee.Number(dnbr.select('dnbr').reduceRegion(**{'reducer': ee.Reducer.mean(),'geometry': ring.geometry(),'scale': 30,'maxPixels': 1e9}).get('dnbr')))
       
   offset = offset.rename('offset').toFloat()
   
@@ -122,12 +123,9 @@ lsCol = ee.ImageCollection(ls8.merge(ls7).merge(ls5))
   task = ee.batch.Export.image.toDrive(**{
     'image': rbr_offset,
     'description': name,
-    'folder':'winter_test_folder',
+    'folder':'winter_test_folder2',
     'scale': 30,
-    'region': fB.getInfo()['coordinates']
+    'region': fireBounds.getInfo()['coordinates']
     })
   # start task
   task.start()
-
-
-
