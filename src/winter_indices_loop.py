@@ -39,93 +39,100 @@ ls4 = ls4SR.map(ls4_7_Indices).map(lsCfmask);
 lsCol = ee.ImageCollection(ls8.merge(ls7).merge(ls5))
 
   
-  fids = fires.aggregate_array('Fire_ID')
-   # turn it to python list
-  fids = fids.getInfo()
-  
-  # loop through list of fire ids
-  for j in fids:
-  name = j
-  
-  
-  fiya = fires.filterMetadata('Fire_ID', 'equals', name).first();
-  ft = ee.Feature(fiya)
-  #get image
-  
-  
-  fName = ft.get("Fire_ID")
-  fire = ft
-  fireBounds = ft.geometry().bounds()
-  year = ft.get('Fire_Year')
-  year = ee.String(year)
-  fireYear = ee.Date(year)
-  preFireYear = fireYear.advance(-1, 'year')
-  postFireYear = fireYear.advance(1, 'year')
-  preFireYearAd = preFireYear.advance(11, 'month')
-  fireYearAd = fireYear.advance(3, 'month')
-  postFireYearAd = postFireYear.advance(3, 'month')
-  fireYearAd2 = fireYear.advance(11, 'month')
+fids = fires.aggregate_array('Fire_ID')
+ # turn it to python list
+fids = fids.getInfo()
 
-  preFireIndices = lsCol \
-          .filterBounds(fireBounds) \
-          .filterDate(preFireYearAd, fireYearAd) \
-          .select('nbr') \
-          .mean() \
-          .rename('preNBR')
-          
-  postFireIndices = lsCol \
-          .filterBounds(fireBounds) \
-          .filterDate(fireYearAd2, postFireYearAd) \
-          .select('nbr') \
-          .max() \
-          .rename('postNBR')
-  
+# loop through list of fire ids
+for j in fids:
+name = j
 
-  # if pixel is 0, go to the next
-  if return_pixel_count(preFireIndices, fireBounds, "preNBR") == 0:
-    continue
+
+fiya = fires.filterMetadata('Fire_ID', 'equals', name).first();
+ft = ee.Feature(fiya)
+#get image
+
+
+fName = ft.get("Fire_ID")
+fire = ft
+fireBounds = ft.geometry().bounds()
+year = ft.get('Fire_Year')
+year = ee.String(year)
+fireYear = ee.Date(year)
+preFireYear = fireYear.advance(-1, 'year')
+postFireYear = fireYear.advance(1, 'year')
+preFireYearAd = preFireYear.advance(11, 'month')
+fireYearAd = fireYear.advance(3, 'month')
+postFireYearAd = postFireYear.advance(3, 'month')
+fireYearAd2 = fireYear.advance(11, 'month')
+
+preFireIndices = lsCol \
+        .filterBounds(fireBounds) \
+        .filterDate(preFireYearAd, fireYearAd) \
+        .select('nbr') \
+        .mean() \
+        .rename('preNBR')
+        
+postFireIndices = lsCol \
+        .filterBounds(fireBounds) \
+        .filterDate(fireYearAd2, postFireYearAd) \
+        .select('nbr') \
+        .max() \
+        .rename('postNBR')
+        
+# if there are no keys correspoding to pre or post fire, go to next        
+if not get_keys(preFireIndices, fireBounds):
+  continue
+
+if not get_keys(postFireIndices, fireBounds):
+  continue
+
+
+# if pixel is 0, go to the next
+if return_pixel_count(preFireIndices, fireBounds, "preNBR") == 0:
+  continue
+
+if return_pixel_count(postFireIndices, fireBounds, "postNBR") == 0:
+  continue
   
-  if return_pixel_count(postFireIndices, fireBounds, "postNBR") == 0:
-    continue
+fireIndices = preFireIndices.addBands(postFireIndices)
+
+dnbr = fireIndices.expression( "(b('preNBR') - b('postNBR')) * 1000").rename('dnbr').toFloat()
+
+ring  = ft.buffer(180).difference(ft);
+
+offset = ee.Image.constant(ee.Number(dnbr.select('dnbr').reduceRegion(**{'reducer': ee.Reducer.mean(),'geometry': ring.geometry(),'scale': 30,'maxPixels': 1e9}).get('dnbr')))
     
-  fireIndices = preFireIndices.addBands(postFireIndices)
-  
-  dnbr = fireIndices.expression( "(b('preNBR') - b('postNBR')) * 1000").rename('dnbr').toFloat()
-  
-  ring  = ft.buffer(180).difference(ft);
-  
-  offset = ee.Image.constant(ee.Number(dnbr.select('dnbr').reduceRegion(**{'reducer': ee.Reducer.mean(),'geometry': ring.geometry(),'scale': 30,'maxPixels': 1e9}).get('dnbr')))
-      
-  offset = offset.rename('offset').toFloat()
-  
-  dnbr = dnbr.addBands(offset)
-  
-  dnbr = dnbr.addBands(fireIndices)
+offset = offset.rename('offset').toFloat()
+
+dnbr = dnbr.addBands(offset)
+
+dnbr = dnbr.addBands(fireIndices)
 
 
-  dnbr_offset = dnbr.expression("b('dnbr') - b('offset')") \
-            .rename('dnbr_w_offset').toFloat()
-            
-  dnbr_offset = dnbr_offset.addBands(fireIndices).addBands(dnbr.select('dnbr'))
-  
-
-  rbr = dnbr_offset.expression("b('dnbr') / (b('preNBR') + 1.001)") \
-            .rename('rbr').toFloat().addBands(dnbr_offset) 
-            
-
-  rbr_offset = rbr.expression("b('dnbr_w_offset') / (b('preNBR') + 1.001)") \
-            .rename('rbr_w_offset').toFloat().addBands(rbr)
+dnbr_offset = dnbr.expression("b('dnbr') - b('offset')") \
+          .rename('dnbr_w_offset').toFloat()
           
-            
-  rbr_offset = rbr_offset.set('fireID' , ft1.get('Fire_ID'),'fireName' , ft1.get('Fire_Name'), 'fireYear' ,  ft1.get('Fire_Year')) 
-  
+dnbr_offset = dnbr_offset.addBands(fireIndices).addBands(dnbr.select('dnbr'))
 
-  task = ee.batch.Export.image.toDrive(**{
-    'image': rbr_offset,
-    'description': name,
-    'folder':'winter_test_folder2',
-    'scale': 30,
-    'region': fireBounds.getInfo()['coordinates']
-    })
-  # start task
-  task.start()
+
+rbr = dnbr_offset.expression("b('dnbr') / (b('preNBR') + 1.001)") \
+          .rename('rbr').toFloat().addBands(dnbr_offset) 
+          
+
+rbr_offset = rbr.expression("b('dnbr_w_offset') / (b('preNBR') + 1.001)") \
+          .rename('rbr_w_offset').toFloat().addBands(rbr)
+        
+          
+rbr_offset = rbr_offset.set('fireID' , ft1.get('Fire_ID'),'fireName' , ft1.get('Fire_Name'), 'fireYear' ,  ft1.get('Fire_Year')) 
+
+
+task = ee.batch.Export.image.toDrive(**{
+  'image': rbr_offset,
+  'description': name,
+  'folder':'winter_burnIndices_subset',
+  'scale': 30,
+  'region': fireBounds.getInfo()['coordinates']
+  })
+# start task
+task.start()
