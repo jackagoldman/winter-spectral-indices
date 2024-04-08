@@ -1,4 +1,4 @@
-input_raster = '/Users/jgoldman/Google Drive/My Drive/winter_test_folder/CHA8_2012_1924.tif'
+input_raster = '/Users/jgoldman/Google Drive/My Drive/winter_burnIndices_subset/'
 input_shapefile = '/Users/jgoldman/Desktop/OneDrive - University of Toronto/Data/chapter_3/on-qc-defol.shp'
 
 
@@ -7,9 +7,12 @@ input_shapefile = '/Users/jgoldman/Desktop/OneDrive - University of Toronto/Data
 
  
   
-  out_path = '/Users/jgoldman/Desktop/OneDrive - University of Toronto/Data/chapter_3/winter_bs/defoliated-rasters/'
+out_path = '/Users/jgoldman/Desktop/OneDrive - University of Toronto/Data/chapter_3/winter_bs/defoliated-rasters/'
 
 rasters = shapefile.shape.getData()
+
+create_mask_from_shapefile(input_shapefile, raster_path, out_path)
+
 
 import os
 
@@ -54,6 +57,5 @@ out_path
                     
 
 
-  create_mask_from_shapefile(input_shapefile, raster_path, out_path)
-  
+
   
