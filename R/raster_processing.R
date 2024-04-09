@@ -124,8 +124,8 @@ get_raster_values <- function(img){
 }
 
 
-
-area_weighted_raster_values <- function(img){
+#take in shapefile or dataset with area column. shape index?
+area_weighted_raster_values <- function(img, shapefile){
   
   
   
